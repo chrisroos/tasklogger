@@ -1,0 +1,33 @@
+* add a readme
+
+* think about data loss
+
+* make it easy to append data to the current task
+
+* it's easy to lose data when editing by hand and forgetting to surround fields-with-comments in quotes
+
+* warn/prompt when starting a new task and the old task was edited yesterday/more than X hours ago
+
+* make it easy to edit existing entries - to make it harder to create malformed csv that might get destroyed
+
+* warn/refuse to write the csv if the existing file contains invalid csv (i.e. if there are not exactly X columns on each row) - this should help prevent accidentally overwriting the existing data
+
+* resume should emit the task that's being resumed
+
+* add reporting to tasklogger command
+
+* make it easy to amend the most recent entry
+
+* offer a pause option?
+
+* sync the tasks with a remote server??
+
+* Generate a weekly report:
+
+  Mon 8th Feb 2010  Project name   2.5   Task 1
+                                         Task 2
+                    Infrastructure 1     Task 1
+                    Meetings       4     Task x
+                                         Task y
+                                   ----
+                                   7.5

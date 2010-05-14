@@ -1,0 +1,161 @@
+#! /usr/bin/env ruby
+
+$: << File.join(File.dirname(__FILE__), '..', 'lib')
+require 'rubygems'
+require 'fastercsv'
+require 'task_logger'
+
+unless description = ARGV[0]
+  puts "Please enter a description for this task."
+  exit 1
+end
+
+default_timelog = File.join(ENV['HOME'], 'timelog.csv')
+timelog = ENV['TIMELOG_DATA'] ? ENV['TIMELOG_DATA'] : default_timelog
+
+# puts "Logging task data to #{timelog}"
+
+time_format = "%Y-%m-%d %H:%M"
+
+if description == 'open'
+  `mate #{timelog}`
+  exit
+end
+
+if description == 'stop'
+  entries    = FasterCSV.read(timelog)
+  last_entry = entries.last
+  if last_entry[1]
+    puts "The last entry already has an end time and I'm not going to overwrite it."
+    exit 1
+  end
+  last_entry[1] = Time.now.strftime(time_format)
+  File.open(timelog, 'w') do |file|
+    entries.each do |entry|
+      file.puts entry.to_csv
+    end
+  end
+  `mate #{timelog}`
+  exit
+end
+
+def hms(duration)
+  hours   = duration.to_i / 3600
+  seconds = duration.to_i % 3600
+  minutes = seconds / 60
+  seconds = seconds % 60
+  [hours, minutes, seconds].join(":")
+end
+
+def decimal_hours(seconds)
+  minutes = seconds / 60.0
+  minutes / 60.0
+end
+
+if description == 'report'
+  require 'time'
+
+  if project_filter = ARGV[1]
+    csv_data = File.read(timelog)
+    total_duration = 0
+
+    puts ''
+    header = 'Start'.ljust(23) + 'End'.ljust(23) + 'Seconds'.ljust(8) + 'H:M:S'.ljust(8) + "Hours".ljust(8) + 'Project'.ljust(12) + 'Description'
+    puts header
+    puts '=' * header.length
+
+    previous_day, day_duration = nil, 0
+
+    rows = FasterCSV.parse(csv_data)
+    matching_entries = rows.select do |row|
+      start_time, end_time, project_name, description = row
+      project_name == project_filter
+    end
+
+    matching_entries.each do |row|
+      start_time, end_time, project_name, description = row
+
+      duration = 0
+      if end_time
+        start_time = Time.parse(start_time)
+        end_time   = Time.parse(end_time)
+        duration   = (end_time - start_time)
+      end
+
+      if (row != matching_entries.first and previous_day != start_time.send(:to_date))
+        # We're on a new day
+        puts '                                              ' + '-'*7 + ' ' + '-'*7 + ' ' + '-'*7
+        print '                                              '
+        print day_duration.to_s.ljust(8)
+        print hms(day_duration).ljust(8)
+        print format("%0.2f", decimal_hours(day_duration)).ljust(8)
+        puts ''
+        puts ''
+        day_duration = 0
+      end
+      previous_day = start_time.send(:to_date)
+      day_duration += duration
+
+      total_duration += duration
+      row.insert(2, duration)
+      row.insert(3, hms(duration))
+      row.insert(4, decimal_hours(duration))
+
+      print Time.parse(row[0]).strftime("%a %d %b %Y %H:%M").ljust(23)
+      print Time.parse(row[1]).strftime("%a %d %b %Y %H:%M").ljust(23)
+      print row[2].to_s.ljust(8)
+      print row[3].to_s.ljust(8)
+      print format("%0.2f", row[4]).ljust(8)
+      print row[5].to_s.ljust(12)
+      puts row[6]
+
+      if row == matching_entries.last
+        # We're on the last day
+        print '                                              '
+        print day_duration.to_s.ljust(8)
+        print hms(day_duration).ljust(8)
+        print format("%0.2f", decimal_hours(day_duration)).ljust(8)
+        puts ''
+        puts ''
+        day_duration = 0
+      end
+
+    end
+    puts ''
+    puts 'Total duration (H:M:S): ' + hms(total_duration)
+    puts "Total duration (decimal hours): #{decimal_hours(total_duration)}"
+    puts ''
+
+  else
+    d = Hash.new(0)
+
+    csv_data = File.read(timelog)
+    FasterCSV.parse(csv_data).each do |row|
+      start_time, end_time, project_name, description = row
+      if end_time
+        start_time = Time.parse(start_time)
+        end_time   = Time.parse(end_time)
+        duration   = (end_time - start_time)
+        d[project_name] += duration
+      end
+    end
+
+    d.each_pair do |project_name, duration|
+      p [project_name, hms(duration)]
+    end
+  end
+  exit
+end
+
+if description == 'resume'
+  TaskLogger.new(timelog).resume
+  exit
+end
+
+if description == 'list'
+  TaskLogger.new(timelog).list
+  exit
+end
+
+# Otherwise we're starting a new task
+TaskLogger.new(timelog).start description
