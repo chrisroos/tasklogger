@@ -1,3 +1,5 @@
+* use gem bundler to manage gem dependencies
+
 * add a readme
 
 * think about data loss
